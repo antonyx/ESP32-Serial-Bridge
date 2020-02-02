@@ -10,6 +10,7 @@ bool debug = true;
 
 #define BUTTON_PIN 0
 #define LED_PIN 5
+#define PRINT_TS
 
 // For AP mode:
 const char *ssid = "ser2net";  // You will connect your phone to this Access Point

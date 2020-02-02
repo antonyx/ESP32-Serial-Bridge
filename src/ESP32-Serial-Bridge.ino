@@ -6,26 +6,23 @@
 // or any other situations where system failure may affect
 // user or environmental safety.
 
+#include <ctype.h>
 #include "config.h"
 #include <esp_wifi.h>
 #include <WiFi.h>
 
-
-
-
 #ifdef BLUETOOTH
 #include <BluetoothSerial.h>
-BluetoothSerial SerialBT; 
+BluetoothSerial SerialBT;
 #endif
 
-#ifdef OTA_HANDLER  
-#include <ArduinoOTA.h> 
-
+#ifdef OTA_HANDLER
+#include <ArduinoOTA.h>
 #endif // OTA_HANDLER
 
 HardwareSerial Serial_one(1);
 HardwareSerial Serial_two(2);
-HardwareSerial* COM[NUM_COM] = {&Serial, &Serial_one , &Serial_two};
+HardwareSerial* COM[NUM_COM] = { &Serial, &Serial_one, &Serial_two };
 
 #define MAX_NMEA_CLIENTS 4
 #ifdef PROTOCOL_TCP
@@ -33,41 +30,51 @@ HardwareSerial* COM[NUM_COM] = {&Serial, &Serial_one , &Serial_two};
 WiFiServer server_0(SERIAL0_TCP_PORT);
 WiFiServer server_1(SERIAL1_TCP_PORT);
 WiFiServer server_2(SERIAL2_TCP_PORT);
-WiFiServer *server[NUM_COM]={&server_0,&server_1,&server_2};
+WiFiServer *server[NUM_COM] = { &server_0, &server_1, &server_2 };
 WiFiClient TCPClient[NUM_COM][MAX_NMEA_CLIENTS];
+int currentConnections = 0;
+#endif
+
+uint8_t buf1[NUM_COM][BUFFER_SIZE];
+uint16_t i1[NUM_COM] = { 0, 0, 0 };
+
+uint8_t buf2[NUM_COM][BUFFER_SIZE];
+uint16_t i2[NUM_COM] = { 0, 0, 0 };
+
+uint8_t BTbuf[BUFFER_SIZE];
+uint16_t iBT = 0;
+
+#ifdef PRINT_TS
+byte hh = 0, mi = 0, ss = 0;
+unsigned int dddd = 0;
+unsigned long lastTick = 0;
 #endif
 
 
-uint8_t buf1[NUM_COM][bufferSize];
-uint16_t i1[NUM_COM]={0,0,0};
-
-uint8_t buf2[NUM_COM][bufferSize];
-uint16_t i2[NUM_COM]={0,0,0};
-
-uint8_t BTbuf[bufferSize];
-uint16_t iBT =0;
-
-
 void setup() {
-
   delay(500);
-  
+
   COM[0]->begin(UART_BAUD0, SERIAL_PARAM0, SERIAL0_RXPIN, SERIAL0_TXPIN);
   COM[1]->begin(UART_BAUD1, SERIAL_PARAM1, SERIAL1_RXPIN, SERIAL1_TXPIN);
   COM[2]->begin(UART_BAUD2, SERIAL_PARAM2, SERIAL2_RXPIN, SERIAL2_TXPIN);
-  
-  if(debug) COM[DEBUG_COM]->println("\n\nLK8000 WiFi serial bridge V1.00");
-  #ifdef MODE_AP 
-   if(debug) COM[DEBUG_COM]->println("Open ESP Access Point mode");
-  //AP mode (phone connects directly to ESP) (no router)
+
+#ifdef LED_PIN
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, false);
+#endif
+
+  if(debug) COM[DEBUG_COM]->printf("\nWiFi serial bridge v%s\n", VERSION);
+
+#ifdef MODE_AP
+  if(debug) COM[DEBUG_COM]->println("Open ESP Access Point mode");
+  // AP mode (phone connects directly to ESP) (no router)
   WiFi.mode(WIFI_AP);
-  WiFi.softAPConfig(ip, ip, netmask); // configure ip address for softAP 
+  WiFi.softAPConfig(ip, ip, netmask); // configure ip address for softAP
   WiFi.softAP(ssid, pw); // configure ssid and password for softAP
-  #endif
+#endif
 
-
-  #ifdef MODE_STA
-   if(debug) COM[DEBUG_COM]->println("Open ESP Station mode");
+#ifdef MODE_STA
+  if(debug) COM[DEBUG_COM]->println("Open ESP Station mode");
   // STATION mode (ESP connects to router and gets an IP)
   // Assuming phone is also connected to that router
   // from RoboRemo you must connect to the IP of the ESP
@@ -75,18 +82,19 @@ void setup() {
   WiFi.begin(ssid, pw);
   if(debug) COM[DEBUG_COM]->print("try to Connect to Wireless network: ");
   if(debug) COM[DEBUG_COM]->println(ssid);
-  while (WiFi.status() != WL_CONNECTED) {   
+  while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     if(debug) COM[DEBUG_COM]->print(".");
   }
   if(debug) COM[DEBUG_COM]->println("\nWiFi connected");
-  
-  #endif
+#endif
+
 #ifdef BLUETOOTH
-  if(debug) COM[DEBUG_COM]->println("Open Bluetooth Server");  
-  SerialBT.begin(ssid); //Bluetooth device name
- #endif
-#ifdef OTA_HANDLER  
+  if(debug) COM[DEBUG_COM]->println("Open Bluetooth Server");
+  SerialBT.begin(ssid); // Bluetooth device name
+#endif
+
+#ifdef OTA_HANDLER
   ArduinoOTA
     .onStart([]() {
       String type;
@@ -116,9 +124,9 @@ void setup() {
   // provided IP to all DNS request
 
   ArduinoOTA.begin();
-#endif // OTA_HANDLER    
+#endif // OTA_HANDLER
 
-  #ifdef PROTOCOL_TCP
+#ifdef PROTOCOL_TCP
   COM[0]->println("Starting TCP Server 1");  
   if(debug) COM[DEBUG_COM]->println("Starting TCP Server 1");  
   server[0]->begin(); // start TCP server 
@@ -150,7 +158,7 @@ void loop()
     while(SerialBT.available())
     {
       BTbuf[iBT] = SerialBT.read(); // read char from client (LK8000 app)
-      if(iBT <bufferSize-1) iBT++;
+      if(iBT <BUFFER_SIZE-1) iBT++;
     }          
     for(int num= 0; num < NUM_COM ; num++)
       COM[num]->write(BTbuf,iBT); // now send to UART(num):          
@@ -178,48 +186,87 @@ void loop()
       TmpserverClient.stop();
     }
   }
+
+#ifdef MODE_AP
+  if (WiFi.softAPgetStationNum() != currentConnections) {
+    currentConnections = WiFi.softAPgetStationNum();
+#ifdef LED_PIN
+    digitalWrite(LED_PIN, currentConnections > 0 ? true : false);
 #endif
- 
+  }
+#endif
+
+#endif
+
   for(int num= 0; num < NUM_COM ; num++)
   {
-    if(COM[num] != NULL)          
+    if(COM[num] != NULL)
     {
       for(byte cln = 0; cln < MAX_NMEA_CLIENTS; cln++)
-      {               
-        if(TCPClient[num][cln]) 
+      {
+        if(TCPClient[num][cln])
         {
           while(TCPClient[num][cln].available())
           {
             buf1[num][i1[num]] = TCPClient[num][cln].read(); // read char from client (LK8000 app)
-            if(i1[num]<bufferSize-1) i1[num]++;
-          } 
+            if(i1[num]<BUFFER_SIZE-1) i1[num]++;
+          }
 
           COM[num]->write(buf1[num], i1[num]); // now send to UART(num):
+#ifdef PRINT_TS
+          if (debug && num != DEBUG_COM) {
+            COM[DEBUG_COM]->printf(">> COM%d(%d): ", num, i1[num]);
+            for (int i = 0; i < i1[num]; i++)
+              COM[DEBUG_COM]->printf("%c", buf1[num][i]);
+            COM[DEBUG_COM]->println();
+          }
+#endif
           i1[num] = 0;
         }
       }
-  
+
       if(COM[num]->available())
       {
         while(COM[num]->available())
-        {     
+        {
           buf2[num][i2[num]] = COM[num]->read(); // read char from UART(num)
-          if(i2[num]<bufferSize-1) i2[num]++;
+          if(i2[num]<BUFFER_SIZE-1) i2[num]++;
         }
         // now send to WiFi:
         for(byte cln = 0; cln < MAX_NMEA_CLIENTS; cln++)
-        {   
-          if(TCPClient[num][cln])                     
+        {
+          if(TCPClient[num][cln])
             TCPClient[num][cln].write(buf2[num], i2[num]);
         }
-#ifdef BLUETOOTH        
+
+#ifdef PRINT_TS
+        if (debug && num != DEBUG_COM) {
+          COM[DEBUG_COM]->printf("%dd/%02d:%02d:%02d << COM%d(%d): ", dddd, hh, mi, ss, num, i2[num]);
+          int clen = buf2[num][i2[num]-1] == '\n' ? i2[num]-1 : i2[num];
+          for (int i = 0; i < clen; i++) {
+            COM[DEBUG_COM]->printf("%c", buf2[num][i]);
+          }
+          COM[DEBUG_COM]->println();
+        }
+#endif
+
+#ifdef BLUETOOTH
         // now send to Bluetooth:
-        if(SerialBT.hasClient())      
-          SerialBT.write(buf2[num], i2[num]);               
-#endif  
+        if(SerialBT.hasClient())
+          SerialBT.write(buf2[num], i2[num]);
+#endif
         i2[num] = 0;
       }
-    }    
+    }
   }
-}
 
+#ifdef PRINT_TS
+  if ((micros() - lastTick) >= 1000000UL) {
+    lastTick += 1000000UL;
+    ss++;
+    if (ss >= 60) { ss-=60; mi++; }
+    if (mi >= 60) { mi-=60; hh++; }
+    if (hh >= 24) { hh-=24; dddd++; }
+  }
+#endif
+}
