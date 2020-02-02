@@ -8,6 +8,7 @@
 
 bool debug = true;
 
+#define VERSION "2.0.0"
 #define BUTTON_PIN 0
 #define LED_PIN 5
 #define PRINT_TS

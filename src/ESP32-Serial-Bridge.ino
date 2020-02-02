@@ -141,7 +141,12 @@ void setup() {
   server[2]->setNoDelay(true);
   #endif
 
-  esp_err_t esp_wifi_set_max_tx_power(50);  //lower WiFi Power
+  // lower WiFi Power
+#if defined(ESP8266)
+  esp_err_t esp_wifi_set_max_tx_power(50);
+#elif defined(ESP32)
+  WiFi.setTxPower(WIFI_POWER_7dBm);
+#endif
 }
 
 
