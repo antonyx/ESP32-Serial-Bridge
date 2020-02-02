@@ -1,21 +1,25 @@
 # ESP32-Serial-Bridge
 
-Transparent WiFi (TCP) to all three UART Bridge, supports both AP and STATION WiFi modes. The .ino file is the code for the ESP32. Use Arduino IDE for ESP32 to compile and upload it to the ESP32.
-I made this project in order to connect Flight equipment devices devices like (Radio, Vario FLARM), to a Flight Computer (Kobo, Smartphones etc.),  but it is not limited to that. You can use it wherever you want, but on your own risk. Read license file for more details.
+Transparent WiFi (TCP) to all three UART Bridge, supports both AP and STATION WiFi modes. The .ino file is the code for the ESP32.
+Use Arduino IDE for ESP32 to compile and upload it to the ESP32.
+I made this project in order to connect Flight equipment devices devices like (Radio, Vario FLARM), to a Flight Computer (Kobo, Smartphones etc.), but it is not limited to that.
+You can use it wherever you want, but on your own risk. Read license file for more details.
 Accesspoint                                                    
-IPAdress: 192.168.4.1                                           
-AP SSID: LK8000                                                   
-AP Password: Flightcomputer                                       
-Used Ports:                                                                                                          
-192.168.4.1:8880  <-> COM0                                     
-192.168.4.1:8881  <-> COM1                                     
-192.168.4.1:8882  <-> COM2                                     
 
-===============================================================
+IP Address:  192.168.4.1
+AP SSID:     set2net
+AP Password: secretpassword
 
-Used Libraries: (must be installed in the arduino IDE):
 
-https://github.com/espressif/arduino-esp32
+Used Ports:
+
+192.168.4.1:8880  <->  COM0
+192.168.4.1:8881  <->  COM1
+192.168.4.1:8882  <->  COM2
+
+Default serial parameters: 115200 baud / 8n1 .
+
+You can change all the parameters in src/config.h .
 
 ===============================================================
 
